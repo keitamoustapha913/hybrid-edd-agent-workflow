@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Git Agent Read-Only Review Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "role", "request_id", "context_sha256", "action", "initiative", "mvp_id", "source_head", "integration_head", "decision", "summary", "risks", "checks"],
+  "properties": {
+    "schema_version": {"type": "integer", "enum": [1]},
+    "role": {"type": "string", "enum": ["GIT"]},
+    "request_id": {"type": "string"},
+    "context_sha256": {"type": "string"},
+    "action": {"enum": ["PREPARE", "COMMIT", "PROMOTE", "SNAPSHOT", "PUSH"]},
+    "initiative": {"type": "string"},
+    "mvp_id": {"type": "string"},
+    "source_head": {"type": "string"},
+    "integration_head": {"type": ["string", "null"]},
+    "decision": {"enum": ["READY", "BLOCK"]},
+    "summary": {"type": "string"},
+    "risks": {"type": "array", "items": {"type": "string"}},
+    "checks": {"type": "array", "items": {"type": "string"}}
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Codex live specialist result and host-materialized artifacts",
+  "type": "object",
+  "properties": {
+    "schema_version": { "type": "integer", "enum": [1] },
+    "role": { "type": "string" },
+    "run_id": { "type": "string" },
+    "mvp_id": { "type": "string" },
+    "status": { "type": "string" },
+    "report_path": { "type": "string" },
+    "output_paths": { "type": "array", "items": { "type": "string" } },
+    "criterion_ids": { "type": "array", "items": { "type": "string" } },
+    "summary": { "type": "string" },
+    "report_markdown": { "type": "string" },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string" },
+          "content": { "type": "string" }
+        },
+        "required": ["path", "content"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "schema_version", "role", "run_id", "mvp_id", "status",
+    "report_path", "output_paths", "criterion_ids", "summary",
+    "report_markdown", "artifacts"
+  ],
+  "additionalProperties": false
+}

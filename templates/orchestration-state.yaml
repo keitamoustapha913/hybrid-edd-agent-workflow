@@ -1,0 +1,82 @@
+# Starter state for a single initiative; replace placeholders only with observed values.
+# This record is not the source of permission for human approval gates.
+schema_version: 1
+mode: HUMAN_GATED_AUTO
+initiative_id: "replace-with-initiative-id"
+status: NOT_STARTED
+
+active:
+  mvp_id: null
+  role: null
+  phase: discovery
+  dispatch_id: null
+  source_revision: null
+  uiux_mode: null              # DESIGN | INSPECT, separate dispatches
+
+project_tracking:
+  parent_ticket: "work/{initiative_id}/project-ticket.md"
+  child_ticket_pattern: "work/{initiative_id}/mvps/{mvp_id}/ticket.md"
+  local_files_authoritative: true
+  last_local_ticket_refresh: null
+  github_mirror:
+    enabled: false
+    repository: null
+    parent_issue: null
+    mvp_subissues: {}
+
+git_integration:
+  branch: "agentflow/{initiative_id}/integration"
+  worktree_path: null
+  last_verified_head: null
+  last_pushed_head: null
+  remote: null
+  promotion_policy: FAST_FORWARD_ONLY
+  commit_and_push_after_real_prove_pass: "Requires approved policy and real runner"
+
+human_approvals: []
+# Each approval event must come from a real human and bind to:
+# gate_id, artifact_path, artifact_hash_or_version, decision,
+# approver, trusted_source, timestamp, authorized_scope.
+# G3 binds product-spec.md AND product-ux-spec.md hashes.
+# G5 binds MVP spec.md AND corresponding MVP ux/spec.md hashes.
+
+ux:
+  product_spec_sha256: null
+  current_mvp_ux_spec_sha256: null
+  design_run_id: null
+  design_report_path: null
+  inspection_run_id: null
+  inspection_report_path: null
+  inspected_source_revision: null
+  inspection_status: null       # UX_VERIFIED | UX_FAILED | INCONCLUSIVE
+  inspection_evidence_paths: []
+
+prototype_review:
+  current_iteration: null
+  current_preview_path: null
+  current_report_sha256: null
+  current_preview_sha256: null
+  current_review_bundle_sha256: null
+  waiting_for_gate: null  # G2_PROTOTYPE when an iteration is ready
+  change_request_count: 0
+  accepted_iteration: null
+  acceptance_path: null
+# Each feedback request belongs to exactly one iteration. A rerun emits a
+# new preview/manifest/bundle and must receive a fresh G2 human decision.
+
+specialist_runs: []
+# Each run records: run_id, role, mvp_id, instruction_file, source_revision,
+# authorized_write_paths, status, handoff_path, evidence_paths, started_at, finished_at.
+
+completed_mvps: []
+handoff_runs: []
+# Each Handoff invocation tracks producer_run_id, read-only Codex session,
+# proposed normalized JSON path, deterministic validation and correction routing.
+retry_counts: {}
+max_automatic_retries_per_stage: 2
+blocked_reason: null
+pending_human_gate: null
+last_transition: null
+
+# Persist state atomically and append durable events before new dispatch.
+# An interrupted or uncertain dispatch needs reconciliation, never blind re-launch.

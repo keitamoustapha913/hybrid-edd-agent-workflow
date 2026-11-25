@@ -1,0 +1,439 @@
+# Descriptive, tool-agnostic manifest for HUMAN_GATED_AUTO orchestration.
+# An external multi-agent runner must execute it; this YAML does not launch agents.
+version: 1
+name: hybrid-edd-multi-agent-workflow
+coordinator_policy: AGENTS.md
+
+orchestration:
+  mode: HUMAN_GATED_AUTO
+  runtime: OPENAI_CODEX_CLI
+  runnable_prototype: prototype/agentflow.py
+  quick_start: uv run workflow.py
+  guided_live_command: "uv run workflow.py live {initiative_id}"
+  guided_live_ui: prototype/live_console.py
+  guided_live_actions: [run_next, approve, request_changes, open_g2_preview, view_report, configure_evidence, collect_evidence, schedule_next_mvp, git_agent_review, prepare_git, commit_verified_source, promote_verified_mvp, snapshot_local_reports, push_integration_optional, reconcile_git_commit]
+  evidence_plan_file: "work/{initiative_id}/evidence-plan.json"
+  evidence_plan_requires_human_commands: true
+  evidence_plan_requires_confirmation_each_run: true
+  live_codex_pilot:
+    implemented: true
+    command: "uv run workflow.py codex-stage {initiative_id} --stage discovery --confirm"
+    dry_run: "uv run workflow.py codex-stage {initiative_id} --stage discovery --dry-run"
+    adapter: prototype/codex_runtime.py
+    extended_result_schema: schemas/codex-live-result.schema.json
+    stage_execution: "one explicit specialist + fresh separate read-only Handoff session"
+    source_worktree: "explicitly attached, selected and clean Git checkout"
+    candidate_root: "work/{initiative_id}/codex-runs/{run_id}/candidate-root"
+    auto_advance: false
+    canonical_ticket_adoption: false
+    evidence_is_independent_proof: false
+    docs: docs/live-codex-mvp01.md
+  live_coordinator_mvp02:
+    implemented: true
+    mode: LIVE_CODEX_HUMAN_GATED
+    adapter: prototype/live_coordinator.py
+    state_backend: "work/{initiative_id}/agentflow.sqlite3 (separate live_* tables)"
+    setup_command: "uv run workflow.py live-init {initiative_id}"
+    dispatch_command: "uv run workflow.py live-run {initiative_id} --confirm"
+    status_command: "uv run workflow.py live-status {initiative_id}"
+    approval_command: "uv run workflow.py live-approve {initiative_id} --gate {gate} --sha {sha}"
+    change_command: "uv run workflow.py live-changes {initiative_id} --reason MESSAGE"
+    reconciliation_command: "uv run workflow.py live-reconcile {initiative_id}"
+    direct_codex_calls_require_confirmation: true
+    progress_until: VERIFY
+    stop_after_verify: AWAITING_EVIDENCE
+    g2_live_preview_in_original_mvp02: NOT_IMPLEMENTED
+    g2_waiver: "legacy-only when no live preview was generated; not permitted for new MVP03 previews"
+    approved_ux_contracts: [product-ux-spec.md, mvps/mvp-01/ux/spec.md]
+    candidate_adoption: "validated quarantined files only; refusal to overwrite non-live files"
+    worktree_tracking: "exact HEAD, branch and content fingerprint including approved RED/GREEN/REFACTOR changes"
+    child_ticket_progress: "live-managed section; preserve human notes"
+    github_write: "optional and explicit; never part of live-run"
+    automatic_git_push: false
+    independent_evidence_proof: false
+    docs: docs/live-coordinator-mvp02.md
+  live_prototype_mvp03:
+    implemented: true
+    adapter: prototype/live_prototype.py
+    producer_stage: PROTOTYPE
+    producer_artifact: "work/{initiative_id}/prototype-preview/index.html"
+    prototype_type: INTERACTIVE_SELF_CONTAINED_OFFLINE_HTML
+    codex_sandbox: read-only
+    required_handoff: "separate read-only Codex Handoff + deterministic schema/path check"
+    versioned_review_root: "work/{initiative_id}/prototype-review-live/iteration-NNN/"
+    frozen_files: [prototype-report.md, preview/index.html, checks.json, preview-manifest.json, review-bundle.json]
+    serve_command: "uv run workflow.py live-preview {initiative_id} --open"
+    serve_bind: "127.0.0.1:ephemeral"
+    serve_content: "only the frozen single-file HTML preview with restrictive CSP sandbox"
+    static_checks_are_ux_proof: false
+    feedback_command: "uv run workflow.py live-changes {initiative_id} --reason MESSAGE"
+    approval_command: "uv run workflow.py live-approve {initiative_id} --gate G2_PROTOTYPE --sha {report_sha} --bundle-sha {review_bundle_sha} --review-notes HUMAN_OBSERVATION"
+    approval_binding: [report_sha256, preview_sha256, manifest_sha256, checks_sha256, review_bundle_sha256, prior_feedback_sha256, git_head]
+    on_changes: "record rejected iteration; pass exact feedback into NEW Codex Prototype session; freeze NEW preview; renew G2"
+    on_acceptance: "write prototype-acceptance.md with human observations and content hashes; Specification uses findings only"
+    app_backend_preview: NOT_IMPLEMENTED
+    github_write: false
+    docs: docs/live-prototype-mvp03.md
+  live_evidence_mvp04:
+    implemented: true
+    adapter: prototype/live_evidence.py
+    after_stage: VERIFY
+    barrier: AWAITING_EVIDENCE
+    run_command: "uv run workflow.py live {initiative_id} (choose [E] Collect evidence)"
+    advanced_scripted_command: "uv run workflow.py live-evidence {initiative_id} with explicit check flags and --confirm"
+    human_command_selection: REQUIRED
+    isolated_snapshot: "ephemeral copy of selected Git tracked + untracked, nonignored regular files"
+    os_security_sandbox: false
+    source_identity: [git_head, named_branch, content_fingerprint]
+    host_evidence_root: "work/{initiative_id}/live-evidence/evidence-{uuid}/"
+    receipt: "work/{initiative_id}/mvps/mvp-01/edd/verification-evidence.md"
+    receipts_include: [argv, exit_code, timed_out, stdout_sha, stderr_sha, image_sha, source_fingerprint]
+    pass_requires: "all independent commands exit 0, fresh images present, source unchanged"
+    ux_inspector: "fresh Codex UIUX INSPECT in read-only mode, then fresh read-only Handoff"
+    gate_after_uiux: G6_UX_INSPECTION
+    g6_requires: [inspection_report_sha256, host_evidence_bundle_sha256, human_observations]
+    on_ux_code_fix: "GREEN -> REFACTOR -> VERIFY -> new host evidence -> fresh UIUX INSPECT -> renewed G6"
+    prove: "fresh Codex PROVE session auditing G6 and unchanged receipt"
+    gate_after_prove: G7_PROVE
+    g7_requires: [proof_report_sha256, host_evidence_bundle_sha256, human_observations]
+    completed_after: HUMAN_APPROVED_G7
+    screenshot_pixels_automatically_graded: false
+    automatic_commit_push_or_deployment: false
+    docs: docs/live-evidence-mvp04.md
+  live_multi_mvp_mvp05:
+    implemented: true
+    adapter: prototype/live_coordinator.py
+    command: "uv run workflow.py live {initiative_id} (choose [M] Next MVP)"
+    advanced_scripted_command: "uv run workflow.py live-next {initiative_id} --confirm"
+    scheduling: "sequential mvp-NN only, from human G4-approved roadmap after prior human G7"
+    per_mvp_state: "live_workflow.active_mvp and live_mvp_completions"
+    subsequent_scope_stage: "fresh MVP_DESIGN + read-only Handoff, unless both scope files exist"
+    subsequent_scope_gate: "G5_MVP_NN (both spec.md and ux/spec.md SHA-bound)"
+    per_mvp_evidence_plan: "work/{initiative_id}/mvps/{mvp_id}/evidence-plan.json (MVP-01 retains work/{initiative_id}/evidence-plan.json)"
+    per_mvp_evidence: "live_evidence_runs.mvp_id, frozen original-source receipts"
+    per_mvp_proof: "human-reviewed G6 and G7 with approval.mvp_id and per-MVP acceptance files"
+    later_mvp_regression_expectations: "include prior MVP behavior in new host checks; older receipts prove only older revisions"
+    dispatch_parallelism: 1
+    arbitrary_dependency_graph_solver: false
+    automatic_git_commit_merge_push_or_deployment: false
+    docs: docs/live-multi-mvp-mvp05.md
+  live_git_delivery_mvp06:
+    implemented: true
+    adapter: prototype/live_delivery.py
+    command: "uv run workflow.py live {initiative_id} (choose [I] Git delivery)"
+    before_codex: "explicit [I] -> [1] creates integration and MVP-01 worktrees"
+    after_approved_g7: "[I] -> [2] commit source -> [3] promote -> [4] snapshot -> [5] optional push"
+    recovery: "[I] -> [6] explicit uncertain-commit reconciliation"
+    source_provenance: "G7 proof approval, original HEAD, original fingerprint, stage-independent manifest, committed Git tree and parent"
+    commit_policy: "only after G7 + local confirmation, on the dedicated MVP branch; normal hooks preserved"
+    promote_policy: "clean worktrees, same Git repository, fast-forward only; human confirmation"
+    report_publication: "local Markdown source of truth; separate approved docs snapshot to integration"
+    remote_push: "separate human confirmation, origin only, named integration ref, non-force"
+    next_mvp_worktree: "fresh sequential MVP branch from latest local integration head after snapshot"
+    status_records: "SQLite live_deliveries plus local parent and MVP sub-ticket sections"
+    github_issues: "optional only; never required or auto-written by this feature"
+    auto_commit_push_or_deployment: false
+    docs: docs/live-git-delivery-mvp06.md
+  live_auto_continuation_mvp07:
+    implemented: true
+    adapter: prototype/live_console.py
+    command: "uv run workflow.py live {initiative_id}"
+    default: "ON for human-confirmed actions; OFF via [T] persisted per initiative"
+    stored_preference: "work/{initiative_id}/agentflow.sqlite3:live_console_preferences"
+    authorization_events: [GATE_APPROVED, CHANGES_REQUESTED, HOST_EVIDENCE_PASS, NEXT_MVP_SCHEDULED, HUMAN_RETRY]
+    automatic_dispatch: "only when the authorized action leaves status READY"
+    automatic_stop: [WAITING_FOR_HUMAN, AWAITING_EVIDENCE, BLOCKED, RUNNING_OR_UNCERTAIN, COMPLETED]
+    initial_or_resumed_READY_requires_N: true
+    g2_feedback: "new prototype/Handoff and frozen preview iteration with renewed G2"
+    evidence_requires_exact_command_confirmation: true
+    g7_never_auto_schedules_future_mvp: true
+    git_actions_always_separately_human_approved: true
+    auto_push_or_github_issue: false
+    audit_event: AUTO_CONTINUATION_AUTHORIZED
+    docs: docs/live-auto-orchestration-mvp07.md
+  git_specialist:
+    implemented: true
+    role_file: agents/git/01-git-delivery.md
+    runtime: OPENAI_CODEX_CLI
+    adapter: prototype/git_agent.py
+    result_schema: schemas/git-review-result.schema.json
+    actions: [PREPARE, COMMIT, PROMOTE, SNAPSHOT, PUSH]
+    separate_session_per_review: true
+    sandbox: read-only
+    handoff: "strict model JSON -> deterministic identity/context/fingerprint validator; no free-form executable commands"
+    status: "READY for human consent or BLOCK"
+    logs: "work/{initiative_id}/git-agent-reviews/{request_id}/"
+    parent_ticket_audit: live_git_agent_reviews
+    execution: "native fixed Git operations in prototype/live_delivery.py, only after separate human approval"
+    human_approval_can_be_inferred_from_agent: false
+    remote_push_requires_separate_human_consent: true
+    github_issues: optional
+  python_manager: uv
+  python_version_file: .python-version
+  prototype_mode: SIMULATION_ONLY
+  prototype_review:
+    adapter: prototype/prototype_review.py
+    review_gate: G2_PROTOTYPE
+    current_pointer: "work/{initiative_id}/prototype-review/current.json"
+    iterations: "work/{initiative_id}/prototype-review/iteration-NNN"
+    preview: "work/{initiative_id}/prototype-review/iteration-NNN/preview/index.html"
+    acceptance: "work/{initiative_id}/prototype-acceptance.md"
+    preview_key: O
+    feedback_key: C
+    approval_key: A
+    change_request: "persist structured feedback; rerun PROTOTYPE; build a fresh preview; request renewed G2"
+    approval_binding: [report_sha256, preview_sha256, manifest_sha256, checks_sha256, review_bundle_sha256, prior_feedback_sha256]
+    carry_forward: "approved findings only; prototype code requires separate review"
+    simulation_preview: STATIC_SYNTHETIC_HTML_ONLY
+  uiux:
+    specialist_role: UIUX
+    prompt: agents/edd/00-uiux.md
+    sessions_per_mvp: [DESIGN, INSPECT]
+    separate_sessions: true
+    code_writes_allowed: false
+    upstream_product_contract: "work/{initiative_id}/product-ux-spec.md"
+    upstream_mvp_contract: "work/{initiative_id}/mvps/{mvp_id}/ux/spec.md"
+    product_gate: G3_PRODUCT_SPEC
+    mvp_gate: G5_MVP_NN
+    gate_companion_sha256_required: true
+    records: "work/{initiative_id}/mvps/{mvp_id}/ux"
+    design_before: REQUIREMENTS
+    inspection_after: VERIFY
+    inspection_before: PROVE
+    real_inspection_gate: UX_VERIFIED
+    real_failure_statuses: [UX_FAILED, INCONCLUSIVE]
+    mock_inspection_status: INSPECTION_RECORDED
+    mock_evidence_is_not_proof: true
+  mvp_progress:
+    overview: prototype/mvp_progress.py
+    key: V
+    snapshot_flag: --mvp-panel
+    source_of_truth: [local_mvp_specs, recorded_approvals, coordinator_stage_index, validated_handoff_events]
+    current_simulation_mvp: mvp-01
+    additional_mvps: UNSCHEDULED_UNTIL_REAL_RUNNER
+  git:
+    adapter: prototype/git_adapter.py
+    operations_implemented: [inspect_repository, list_worktrees, create_explicit_mvp_worktree, select_worktree, revision_bound_mock_gates, create_integration_worktree, fast_forward_promotion, explicit_nonforce_push]
+    local_first: true
+    bind_repository_before_first_stage: true
+    preserve_repository_identity: true
+    do_not_mutate_existing_worktrees_implicitly: true
+    require_clean_baseline_for_simulated_transitions: true
+    real_coding_runner_requires_diff_aware_revision_tracking: true
+    integration:
+      branch: "agentflow/{initiative_id}/integration"
+      dedicated_worktree: true
+      new_mvp_base: "integration HEAD when configured"
+      promote: FAST_FORWARD_ONLY
+      require_real_prove_pass_before_automatic_promotion: true
+      divergent_history: BLOCK_FOR_REVIEW
+      push_policy: EXPLICIT_NON_FORCE
+    artifact_snapshot:
+      adapter: prototype/project_artifacts.py
+      destination: "docs/agentflow/{initiative_id}"
+      require_content_review_before_push: true
+  local_tickets:
+    enabled: true
+    source_of_truth: LOCAL_MARKDOWN
+    adapter: prototype/local_tickets.py
+    parent: "work/{initiative_id}/project-ticket.md"
+    child: "work/{initiative_id}/mvps/{mvp_id}/ticket.md"
+    generate_child_when: "MVP DESIGN produces a spec.md"
+    update_after: [specialist_handoff, human_gate, retry, integration_event]
+    preserve_human_notes: true
+    include: [plan_links, specification_links, report_links, ux_contracts, ux_progress, hashes, gate_status, mvp_progress]
+  github_mirror:
+    enabled_by_default: false
+    optional: true
+    adapter: prototype/github_adapter.py
+    parent: "one GitHub issue per initiative"
+    child: "native GitHub sub-issue per generated MVP"
+    progress_updates: EXPLICIT_WHEN_CONNECTED
+    can_block_local_workflow: false
+  coordinator_role: COORDINATOR
+  coordinator_prompt: agents/00-coordinator.md
+  runtime_adapter_contract: docs/runtime-adapter.md
+  codex_adapter_contract: docs/codex-cli-adapter.md
+  specialist_output_schema: schemas/specialist-result.schema.json
+  handoff:
+    enabled: true
+    after_every_specialist: true
+    role: HANDOFF
+    prompt: agents/00-handoff.md
+    execution_sandbox: read-only
+    output_schema: schemas/handoff.schema.json
+    validator: scripts/validate_handoff.py
+    normalized_output: "work/{initiative_id}/handoffs/{run_id}/normalized-handoff.json"
+    max_normalization_retries: 2
+    next_stage_requires: "schema and safe paths valid; run/status/criteria consistent; actual evidence and approval gates confirmed"
+  state_template: templates/orchestration-state.yaml
+  state_file: "work/{initiative_id}/orchestration-state.yaml"
+  event_log: "work/{initiative_id}/orchestration-events.jsonl"
+  local_parent_ticket: "work/{initiative_id}/project-ticket.md"
+  approval_log: "work/{initiative_id}/approvals.md"
+  approval_request_template: templates/approval-request.md
+  distinct_agent_sessions: true
+  max_concurrent_write_agents: 1
+  max_automatic_retries_per_stage: 2
+  auto_advance_technical_phases: true
+  approve_only_from_trusted_human_channel: true
+  require_artifact_revision_match: true
+  dispatch_policy: "persist state and unique dispatch ID before launch; reconcile uncertain runs"
+  human_gates:
+    G1_DISCOVERY: "Approved discovery and experiment, then PROTOTYPE"
+    G2_PROTOTYPE: "Reviewed exact report, preview and evidence bundle; every change reruns PROTOTYPE and requires renewed G2; explicit waiver possible"
+    G3_PRODUCT_SPEC: "Approved product-spec.md plus product-ux-spec.md with separate SHA-256 bindings, then MVP DESIGN"
+    G4_ROADMAP: "Approved roadmap; this alone does not authorize MVP implementation"
+    G5_MVP_NN: "Approved specific MVP spec plus ux/spec.md by SHA-256, then UIUX DESIGN and REQUIREMENTS"
+    G6_UX_INSPECTION: "Live MVP-01: reviewed exact independent UIUX report, host-run test/visual bundle and recorded human observations"
+    G7_PROVE: "Live MVP-01: reviewed exact PROVE report, unchanged host evidence bundle and final human observations"
+    RELEASE: "Separate explicit deployment/release authorization"
+  stop_on:
+    - "missing, stale, fabricated, or ambiguous human approval"
+    - "material change to requirements or approved scope"
+    - "unsafe, destructive, or production-changing action outside authority"
+    - "missing independent agent runner or trusted approval channel"
+    - "unresolved specialist failure, missing evidence, or retry exhaustion"
+    - "integration branch divergence or unexpected external revision at promotion/push"
+
+variables:
+  initiative_id: "set-from-user-brief"
+  mvp_id: "set-from-approved-roadmap"
+
+initiative:
+  work_root: "work/{initiative_id}"
+  starting_input: "work/{initiative_id}/brief.md"
+  phases:
+    - id: discovery
+      role: DISCOVERY
+      prompt: agents/hybrid/01-discovery.md
+      output: "work/{initiative_id}/discovery.md"
+      gate_after: G1_DISCOVERY
+    - id: prototype
+      role: PROTOTYPE
+      prompt: agents/hybrid/02-prototype.md
+      input: "work/{initiative_id}/discovery.md"
+      output: "work/{initiative_id}/prototype-report.md"
+      preview_review: "work/{initiative_id}/prototype-review/current.json"
+      gate_after: G2_PROTOTYPE
+      exception: "Only an explicit human-documented waiver permits skipping this phase"
+    - id: specification
+      role: SPECIFICATION
+      prompt: agents/hybrid/03-specification.md
+      output:
+        - "work/{initiative_id}/product-spec.md"
+        - "work/{initiative_id}/product-ux-spec.md"
+      gate_after: G3_PRODUCT_SPEC
+      gate_companion_hash: "work/{initiative_id}/product-ux-spec.md"
+    - id: mvp_design
+      role: MVP_DESIGN
+      prompt: agents/hybrid/04-mvp-design.md
+      output:
+        - "work/{initiative_id}/mvp-roadmap.md"
+        - "work/{initiative_id}/mvps/{mvp_id}/spec.md"
+        - "work/{initiative_id}/mvps/{mvp_id}/ux/spec.md"
+      gate_after: G4_ROADMAP
+      per_mvp_gate_before_edd: G5_MVP_NN
+
+mvp_execution:
+  foreach: "approved MVP from mvp-roadmap.md, in dependency order"
+  independent_agent_sessions: true
+  shared_inputs:
+    - "work/{initiative_id}/product-spec.md"
+    - "work/{initiative_id}/product-ux-spec.md"
+    - "work/{initiative_id}/mvp-roadmap.md"
+    - "work/{initiative_id}/mvps/{mvp_id}/spec.md"
+    - "work/{initiative_id}/mvps/{mvp_id}/ux/spec.md"
+  working_records: "work/{initiative_id}/mvps/{mvp_id}/edd"
+  ux_records: "work/{initiative_id}/mvps/{mvp_id}/ux"
+  local_subticket: "work/{initiative_id}/mvps/{mvp_id}/ticket.md"
+  preconditions:
+    - "specific MVP feature spec and UX spec both explicitly approved and hash-bound"
+    - "MVP dependencies satisfied"
+    - "changes within approved execution scope"
+  phases:
+    - id: ux_design
+      role: UIUX
+      mode: DESIGN
+      prompt: agents/edd/00-uiux.md
+      output:
+        - "work/{initiative_id}/mvps/{mvp_id}/ux/design.md"
+        - "work/{initiative_id}/mvps/{mvp_id}/ux/design-review.md"
+      continue_if: "DESIGN_READY; UX scope is traceable to G3/G5 and inspectable before testing"
+      accepted_statuses: [DESIGN_READY]
+    - id: requirements
+      role: REQUIREMENTS
+      prompt: agents/edd/01-requirements.md
+      output: "work/{initiative_id}/mvps/{mvp_id}/edd/requirements.md"
+      continue_if: "READY; frozen criteria aligned with approved MVP spec"
+      accepted_statuses: [READY]
+    - id: red
+      role: RED
+      prompt: agents/edd/02-red.md
+      output: "work/{initiative_id}/mvps/{mvp_id}/edd/red.md"
+      continue_if: "RED_CONFIRMED or truthful ALREADY_GREEN exception"
+      accepted_statuses: [RED_CONFIRMED, ALREADY_GREEN]
+    - id: green
+      role: GREEN
+      prompt: agents/edd/03-green.md
+      output: "work/{initiative_id}/mvps/{mvp_id}/edd/green.md"
+      continue_if: GREEN_CONFIRMED
+      accepted_statuses: [GREEN_CONFIRMED]
+    - id: refactor
+      role: REFACTOR
+      prompt: agents/edd/04-refactor.md
+      output: "work/{initiative_id}/mvps/{mvp_id}/edd/refactor.md"
+      continue_if: "REFACTOR_COMPLETE or NO_REFACTOR_NEEDED"
+      accepted_statuses: [REFACTOR_COMPLETE, NO_REFACTOR_NEEDED]
+    - id: verify
+      role: VERIFY
+      prompt: agents/edd/05-verify.md
+      output: "work/{initiative_id}/mvps/{mvp_id}/edd/verify.md"
+      evidence_dir: "work/{initiative_id}/mvps/{mvp_id}/edd/evidence"
+      continue_if: "Live MVP-NN VERIFIED → AWAITING_EVIDENCE → this-MVP host-run checks/screenshots → UIUX INSPECT; failed checks block"
+      accepted_statuses_for_auto_advance: [VERIFIED]
+      must_check:
+        - "active MVP acceptance criteria"
+        - "impacted earlier MVP regression criteria"
+        - "code/configuration identity on which checks ran"
+    - id: ux_inspect
+      role: UIUX
+      mode: INSPECT
+      prompt: agents/edd/00-uiux.md
+      output: "work/{initiative_id}/mvps/{mvp_id}/ux/inspection.md"
+      evidence_dir: "work/{initiative_id}/mvps/{mvp_id}/ux/evidence"
+      continue_if: "UX_VERIFIED with real source-bound observation; INSPECTION_RECORDED is mock-only"
+      accepted_statuses_for_real_auto_advance: [UX_VERIFIED]
+      live_gate_after: G6_UX_INSPECTION
+      mock_status: INSPECTION_RECORDED
+      require:
+        - "all applicable MVP-NN-UX-NNN checked against actual rendered experience"
+        - "screenshots, traces, platform/viewport and accessibility observations as applicable"
+        - "source revision matches VERIFY and PROVE"
+        - "impacted UX regressions from earlier MVPs"
+    - id: prove
+      role: PROVE
+      prompt: agents/edd/06-prove.md
+      output: "work/{initiative_id}/mvps/{mvp_id}/edd/prove.md"
+      final_outcomes: [PASS, FAIL, INCONCLUSIVE]
+      accepted_statuses_for_next_mvp: [PASS]
+      live_gate_after: G7_PROVE
+  on_failure:
+    ux_scope_gap: "human + owning SPECIFICATION or MVP_DESIGN role; renew G3/G5"
+    ux_inspection_failure: "GREEN -> VERIFY -> UIUX INSPECT -> PROVE"
+    ux_inspection_inconclusive: "collect evidence and rerun UIUX INSPECT; no genuine PROVE PASS"
+    unclear_scope: "human + owning SPECIFICATION or MVP_DESIGN role"
+    bad_red_test: RED
+    implementation_failure: GREEN
+    refactor_regression: REFACTOR
+    verify_behavior_failure: "GREEN -> REFACTOR -> VERIFY -> UIUX INSPECT -> PROVE"
+    stale_or_missing_evidence: "VERIFY -> UIUX INSPECT -> PROVE"
+  after_pass:
+    - "record revision-bound MVP completion"
+    - "require a real UIUX INSPECT result UX_VERIFIED (or human-approved N/A) before authentic PASS"
+    - "refresh local MVP and parent tickets with the PROVE receipt"
+    - "integrate committed, verified MVP work into the single initiative integration branch with safe checks"
+    - "push the integration branch non-force only to the explicitly configured and authorized remote"
+    - "optionally mirror local progress to GitHub Issues if connected"
+    - "require any next MVP to be specifically approved and dependencies satisfied"
+    - "do not equate PASS with deployment permission"

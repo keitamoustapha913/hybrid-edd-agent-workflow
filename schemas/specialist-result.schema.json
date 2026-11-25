@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Specialist final result",
+  "type": "object",
+  "properties": {
+    "schema_version": { "type": "integer", "enum": [1] },
+    "role": { "type": "string" },
+    "run_id": { "type": "string" },
+    "mvp_id": { "type": "string" },
+    "status": { "type": "string" },
+    "report_path": { "type": "string" },
+    "output_paths": { "type": "array", "items": { "type": "string" } },
+    "criterion_ids": { "type": "array", "items": { "type": "string" } },
+    "summary": { "type": "string" }
+  },
+  "required": [
+    "schema_version", "role", "run_id", "mvp_id", "status",
+    "report_path", "output_paths", "criterion_ids", "summary"
+  ],
+  "additionalProperties": false
+}
